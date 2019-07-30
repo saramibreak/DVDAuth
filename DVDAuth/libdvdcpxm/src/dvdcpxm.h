@@ -30,8 +30,7 @@ extern "C" {
 /*
  * Exported prototypes.
  */
-extern int dvdcss_init   (char *psz_target);
-extern int dvdcpxm_init   (char *psz_target);
+extern int dvd_init   (char *psz_target, char *psz_protection);
 extern int dvdcpxm_decrypt(void *p_buffer, int nr_blocks, int flags);
 
 #ifdef __cplusplus

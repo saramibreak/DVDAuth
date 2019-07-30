@@ -96,11 +96,6 @@ typedef struct _VOB {
 	INT idx;
 } VOB, *PVOB;
 
-VOID OutputLastErrorNumAndString(
-	LPCTSTR pszFuncName,
-	LONG lLineNum
-);
-
 BOOL ReadDVDForFileSystem(
 	PDEVICE pDevice,
 	CDB::_READ12* cdb,

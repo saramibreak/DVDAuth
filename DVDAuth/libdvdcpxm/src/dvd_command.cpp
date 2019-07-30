@@ -6,6 +6,8 @@ HANDLE h_dvd;
 SCSI_PASS_THROUGH_DIRECT sptd;
 uint8_t *sptd_buf = NULL;
 
+extern VOID OutputLastErrorNumAndString(LPCTSTR pszFuncName, LONG lLineNum);
+
 void ioctl_Init(int i_type, int i_size)
 {
 	if (sptd_buf)
@@ -53,6 +55,10 @@ int ioctl_ReadPhysical(int i_layer, PDVD_PHYSICAL_DESCRIPTOR p_physical)
 		B2N_32(p_physical->EndPhysicalSectorOfDataArea);
 		B2N_32(p_physical->EndPhysicalSectorOfLayer0);
 	}
+	else
+	{
+		OutputLastErrorNumAndString(__FUNCTION__, __LINE__);
+	}
 	return i_ret;
 }
 
@@ -66,19 +72,38 @@ int ioctl_ReadCopyright(int i_layer, PDVD_COPYRIGHT_DESCRIPTOR p_copyright)
 	i_ret = ioctl_Send(&i_bytes);
 	if (i_ret == 0)
 		memcpy(p_copyright, &sptd_buf[4], sizeof(DVD_COPYRIGHT_DESCRIPTOR));
+	else
+		OutputLastErrorNumAndString(__FUNCTION__, __LINE__);
 	return i_ret;
 }
 
 int ioctl_ReadDiscKey(int *p_agid, uint8_t *p_key)
 {
+#if 1
+	uint8_t buf[DVD_DISC_KEY_LENGTH];
+	DWORD i_bytes;
+	int i_ret;
+	PDVD_COPY_PROTECT_KEY key = (PDVD_COPY_PROTECT_KEY)&buf;
+	memset(&buf, 0, sizeof(buf));
+	key->KeyLength = DVD_DISC_KEY_LENGTH;
+	key->SessionId = *p_agid;
+	key->KeyType = DvdDiskKey;
+	key->KeyFlags = 0;
+	i_ret = DeviceIoControl(h_dvd, IOCTL_DVD_READ_KEY, key, key->KeyLength, key, key->KeyLength, &i_bytes, NULL) ? 0 : -1;
+	if (i_ret == 0)
+		memcpy(p_key, key->KeyData, DVD_DISCKEY_SIZE);
+#else
 	int i_bytes;
 	int i_ret;
 	ioctl_Init(GPCMD_READ_DISC_STRUCTURE, DVD_DISCKEY_SIZE + 4);
-	sptd.Cdb[7]  = DVD_STRUCT_DISCKEY;
+	sptd.Cdb[7] = DVD_STRUCT_DISCKEY;
 	sptd.Cdb[10] = *p_agid << 6;
 	i_ret = ioctl_Send(&i_bytes);
 	if (i_ret == 0)
 		memcpy(p_key, sptd_buf + 4, DVD_DISCKEY_SIZE);
+#endif
+	else
+		OutputLastErrorNumAndString(__FUNCTION__, __LINE__);
 	return i_ret;
 }
 
@@ -97,6 +122,8 @@ int ioctl_ReadTitleKey(int *p_agid, int i_pos, uint8_t *p_key)
 	i_ret = DeviceIoControl(h_dvd, IOCTL_DVD_READ_KEY, key, key->KeyLength, key, key->KeyLength, &i_bytes, NULL) ? 0 : -1;
 	if (i_ret == 0)
 		memcpy(p_key, key->KeyData, DVD_KEY_SIZE);
+	else
+		OutputLastErrorNumAndString(__FUNCTION__, __LINE__);
 	return i_ret;
 }
 
@@ -147,10 +174,12 @@ int ioctl_ReportChallenge(int *p_agid, uint8_t *p_challenge)
 	i_ret = DeviceIoControl(h_dvd, IOCTL_DVD_READ_KEY, key, key->KeyLength, key, key->KeyLength, &i_bytes, NULL) ? 0 : -1;
 	if (i_ret == 0)
 		memcpy(p_challenge, key->KeyData, DVD_CHALLENGE_SIZE);
+	else
+		OutputLastErrorNumAndString(__FUNCTION__, __LINE__);
 	return i_ret;
 }
 
-int ioctl_ReportASF(int *p_remove_me, int *p_asf)
+int ioctl_ReportASF(int *p_agid, int *p_asf)
 {
 	uint8_t buf[DVD_ASF_LENGTH];
 	PDVD_COPY_PROTECT_KEY key;
@@ -159,12 +188,15 @@ int ioctl_ReportASF(int *p_remove_me, int *p_asf)
 	key = (PDVD_COPY_PROTECT_KEY)&buf;
 	memset(&buf, 0, sizeof(buf));
 	key->KeyLength  = DVD_ASF_LENGTH;
+	key->SessionId = *p_agid;
 	key->KeyType    = DvdAsf;
 	key->KeyFlags   = 0;
 	((PDVD_ASF)key->KeyData)->SuccessFlag = *p_asf;
 	i_ret = DeviceIoControl(h_dvd, IOCTL_DVD_READ_KEY, key, key->KeyLength, key, key->KeyLength, &i_bytes, NULL) ? 0 : -1;
 	if (i_ret == 0)
 		*p_asf = ((PDVD_ASF)key->KeyData)->SuccessFlag;
+	else
+		OutputLastErrorNumAndString(__FUNCTION__, __LINE__);
 	return i_ret;
 }
 
@@ -183,6 +215,8 @@ int ioctl_ReportKey1(int *p_agid, uint8_t *p_key)
 	i_ret = DeviceIoControl(h_dvd, IOCTL_DVD_READ_KEY, key, key->KeyLength, key, key->KeyLength, &i_bytes, NULL ) ? 0 : -1;
 	if (i_ret == 0)
 		memcpy(p_key, key->KeyData, DVD_KEY_SIZE);
+	else
+		OutputLastErrorNumAndString(__FUNCTION__, __LINE__);
 	return i_ret;
 }
 
@@ -239,12 +273,16 @@ int ioctl_ReportRPC(int *p_type, int *p_mask, int *p_scheme)
 	key->KeyLength  = DVD_RPC_KEY_LENGTH;
 	key->KeyType    = DvdGetRpcKey;
 	key->KeyFlags   = 0;
-	i_ret = DeviceIoControl(h_dvd, IOCTL_DVD_READ_KEY, key, key->KeyLength, key, key->KeyLength, &i_bytes, NULL);
+	i_ret = DeviceIoControl(h_dvd, IOCTL_DVD_READ_KEY, key, key->KeyLength, key, key->KeyLength, &i_bytes, NULL) ? 0 : -1;
 	if (i_ret == 0)
 	{
 		*p_type = ((PDVD_RPC_KEY)key->KeyData)->TypeCode;
 		*p_mask = ((PDVD_RPC_KEY)key->KeyData)->RegionMask;
 		*p_scheme = ((PDVD_RPC_KEY)key->KeyData)->RpcScheme;
+	}
+	else
+	{
+		OutputLastErrorNumAndString(__FUNCTION__, __LINE__);
 	}
 	return i_ret;
 }

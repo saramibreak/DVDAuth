@@ -363,13 +363,13 @@ uint8_t *cppm_get_mkb(char *psz_mkb)
 	return p_mkb;
 }
 
-uint8_t *cprm_get_mkb(void)
+uint8_t *cprm_get_mkb(unsigned short ProtectionType)
 {
 	uint8_t mkb_pack[CPRM_MKB_PACK_SIZE];
 	uint8_t *p_mkb = NULL;
 	int mkb_packs, i;
 
-	if (GetBusKey())
+	if (GetBusKey(ProtectionType))
 		return (uint8_t *)-1;
 	mkb_packs = 16;
 	if (ioctl_ReadCPRMMKBPack(&css.agid, 0, (uint8_t*)mkb_pack, &mkb_packs))
@@ -415,13 +415,13 @@ uint8_t *cprm_get_mkb(void)
 	return p_mkb;
 }
 
-int cppm_set_id_album(void)
+int cppm_set_id_album(unsigned short ProtectionType)
 {
 	uint8_t p_buffer[DVD_DISCKEY_SIZE];
 	int i;
 
 	id_album = 0;
-	if (GetBusKey())
+	if (GetBusKey(ProtectionType))
 		return -1;
 	if (ioctl_ReadDiscKey(&css.agid, p_buffer))
 		return -1;
@@ -437,12 +437,12 @@ int cppm_set_id_album(void)
 	return 0;
 }
 
-int cprm_set_id_media(void)
+int cprm_set_id_media(unsigned short ProtectionType)
 {
 	uint8_t p_buffer[CPRM_MEDIA_ID_SIZE + 4];
 
 	id_media = 0;
-	if (GetBusKey())
+	if (GetBusKey(ProtectionType))
 		return -1;
 	/* Get CPRM IDmedia and DVD-MAC(IDmedia) keys */
 	if (ioctl_ReadCPRMMediaId(&css.agid, p_buffer))
@@ -574,64 +574,40 @@ int vr_get_k_te(char *psz_vr_mangr)
 	return ret;
 }
 
-int dvdcss_init(char *psz_target)
+int dvdcss_init(unsigned short ProtectionType)
 {
-	char psz_dvddev[8];
-	int ret = -1;
-
-	strcpy(psz_dvddev, "\\\\.\\?:");
-	psz_dvddev[4] = psz_target[0];
-	h_dvd = dvddev_open(psz_dvddev);
-	if (h_dvd == INVALID_HANDLE_VALUE)
-		return ret;
-	GetDiscKey();
-	for (int i = 0; i < css.vob[0].idx; i++) {
-		ret = GetTitleKey(css.vob[i].lba);
-		if (ret == 0) {
-			fprintf(fpLog, "LBA: %7d, Filename: %s, TitleKey: %02X %02X %02X %02X %02X\n"
-				, css.vob[i].lba, css.vob[i].fname
-				, css.p_title_key[0], css.p_title_key[1], css.p_title_key[2]
-				, css.p_title_key[3], css.p_title_key[4]);
-		}
-		else if (ret == -1) {
-			fprintf(stderr, "Failed to get the TitleKey\n");
-		}
-		else if (ret == -2) {
-			fprintf(fpLog, "LBA: %7d, Filename: %s, No TitleKey\n"
-				, css.vob[i].lba, css.vob[i].fname);
+	int ret = GetDiscKey(ProtectionType);
+	if (ret == 0) {
+		for (int i = 0; i < css.vob[0].idx; i++) {
+			fprintf(fpLog, "LBA: %7d, Filename: %s, ", css.vob[i].lba, css.vob[i].fname);
+			ret = GetTitleKey(css.vob[i].lba, ProtectionType);
+			if (ret == 0) {
+				fprintf(fpLog, "DecryptedTitleKey: %02X %02X %02X %02X %02X\n"
+					, css.p_title_key[0], css.p_title_key[1], css.p_title_key[2]
+					, css.p_title_key[3], css.p_title_key[4]);
+			}
+			else if (ret == -2) {
+				fprintf(fpLog, "No TitleKey\n");
+			}
 		}
 	}
-	dvddev_close(h_dvd);
 	return ret;
 }
 
-int dvdcpxm_init(char *psz_target)
+int dvdcpxm_init(char *psz_target, unsigned short ProtectionType)
 {
-	char psz_dvddev[8];
-	DVD_COPYRIGHT_DESCRIPTOR copyright;
 	char psz_file[MAX_PATH];
 	uint8_t *p_mkb;
 	int ret = -1;
-	
-	strcpy(psz_dvddev, "\\\\.\\?:");
-	psz_dvddev[4] = psz_target[0];
-	h_dvd = dvddev_open(psz_dvddev);
-	if (h_dvd == INVALID_HANDLE_VALUE)
-		return -1;
-	if (ioctl_ReadCopyright(0, &copyright) < 0)
-	{
-		dvddev_close(h_dvd);
-		return -1;
-	}
+
 	c2_init();
-	media_type = copyright.CopyrightProtectionType;
-	switch (copyright.CopyrightProtectionType)
+	switch (ProtectionType)
 	{
 	case COPYRIGHT_PROTECTION_NONE:
 		ret = 0;
 		break;
 	case COPYRIGHT_PROTECTION_CPPM:
-		if (cppm_set_id_album() == 0)
+		if (cppm_set_id_album(ProtectionType) == 0)
 		{
 			strcpy(psz_file, "?:\\AUDIO_TS\\DVDAUDIO.MKB");
 			psz_file[0] = psz_target[0];
@@ -651,9 +627,9 @@ int dvdcpxm_init(char *psz_target)
 		}
 		break;
 	case COPYRIGHT_PROTECTION_CPRM:
-		if (cprm_set_id_media() == 0)
+		if (cprm_set_id_media(ProtectionType) == 0)
 		{
-			p_mkb = cprm_get_mkb();
+			p_mkb = cprm_get_mkb(ProtectionType);
 			if (p_mkb)
 			{
 				ret = process_mkb(p_mkb, cprm_device_keys, sizeof(cprm_device_keys) / sizeof(*cprm_device_keys), &media_key);
@@ -673,8 +649,35 @@ int dvdcpxm_init(char *psz_target)
 		}
 		break;
 	}
-	dvddev_close(h_dvd);
 	return media_type;
+}
+
+int dvd_init(char *psz_target, char* psz_protection)
+{
+	char psz_dvddev[8];
+	int ret = -1;
+
+	strcpy(psz_dvddev, "\\\\.\\?:");
+	psz_dvddev[4] = psz_target[0];
+	h_dvd = dvddev_open(psz_dvddev);
+	if (h_dvd == INVALID_HANDLE_VALUE)
+		return -1;
+
+	DVD_COPYRIGHT_DESCRIPTOR copyright;
+	if (ioctl_ReadCopyright(0, &copyright) < 0)
+	{
+		dvddev_close(h_dvd);
+		return -1;
+	}
+
+	if (!strncmp(psz_protection, "css", 3)) {
+		ret = dvdcss_init(copyright.CopyrightProtectionType);
+	}
+	else {
+		ret = dvdcpxm_init(psz_target, copyright.CopyrightProtectionType);
+	}
+	dvddev_close(h_dvd);
+	return ret;
 }
 
 int mpeg2_check_pes_scrambling_control(uint8_t *p_block)

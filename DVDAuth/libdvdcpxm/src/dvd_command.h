@@ -78,7 +78,7 @@ extern int  ioctl_ReadTitleKey   (int *p_agid, int i_pos, uint8_t *p_key);
 extern int  ioctl_ReportAgidCssCppm(int *p_protection, int *p_agid);
 extern int  ioctl_ReportAgidCprm (int *p_protection, int *p_agid);
 extern int  ioctl_ReportChallenge(int *p_agid, uint8_t *p_challenge);
-extern int  ioctl_ReportASF      (int *p_remove_me, int *p_asf);
+extern int  ioctl_ReportASF      (int *p_agid, int *p_asf);
 extern int  ioctl_ReportKey1     (int *p_agid, uint8_t *p_key);
 extern int  ioctl_InvalidateAgid (int *p_agid);
 extern int  ioctl_SendChallenge  (int *p_agid, uint8_t *p_challenge);

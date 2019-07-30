@@ -362,48 +362,65 @@ uint8_t p_crypt_tab3[288] =
 
 css_t css;
 
-int GetTitleKey(int nLBA)
+int GetTitleKey(int nLBA, unsigned short ProtectionType)
 {
 	uint8_t p_buffer[KEY_SIZE];
 	dvd_key_t p_title_key;
 	int i;
-	if (GetBusKey() < 0)
+	if (GetBusKey(ProtectionType) < 0)
+	{
+		fprintf(fpLog, "Failed to GetBusKey\n");
 		return -1;
+	}
 	/* Get encrypted title key */
 	if (ioctl_ReadTitleKey(&css.agid, nLBA, p_buffer))
+	{
+		fprintf(fpLog, "Failed to ReadTitleKey\n");
 		return -1;
+	}
 	/* This should have invaidated the AGID and got us ASF=1. */
 	if (GetASF() != 1)
 	{
 		ioctl_InvalidateAgid(&css.agid);
+		fprintf(fpLog, "Failed to GetASF\n");
 		return -1;
 	}
 	/* Shuffle title key using bus key */
 	for (i = 0; i < KEY_SIZE; i++)
 		p_buffer[i] ^= css.p_bus_key[4 - (i % KEY_SIZE)];
-	if (!(p_buffer[0] | p_buffer[1] | p_buffer[2] | p_buffer[3] | p_buffer[4])) {
+	if (!(p_buffer[0] | p_buffer[1] | p_buffer[2] | p_buffer[3] | p_buffer[4]))
+	{
 		return -2;
 	}
+	fprintf(fpLog, "EncryptedTitleKey: %02X %02X %02X %02X %02X, "
+		, p_buffer[0], p_buffer[1], p_buffer[2], p_buffer[3], p_buffer[4]);
 	/* Decrypt title key with disc key. */
 	DecryptTitleKey(0, css.p_disc_key, p_buffer, p_title_key);
 	memcpy(css.p_title_key, p_title_key, KEY_SIZE);
 	return 0;
 }
 
-int GetDiscKey(void)
+int GetDiscKey(unsigned short ProtectionType)
 {
 	uint8_t p_buffer[DVD_DISCKEY_SIZE];
 	dvd_key_t p_disc_key;
 	int i;
-	if (GetBusKey() < 0)
+	if (GetBusKey(ProtectionType) < 0)
+	{
+		fprintf(fpLog, "Failed to GetBusKey\n");
 		return -1;
+	}
 	/* Get encrypted disc key */
 	if (ioctl_ReadDiscKey(&css.agid, p_buffer))
+	{
+		fprintf(fpLog, "Failed to ReadDiscKey\n");
 		return -1;
+	}
 	/* This should have invaidated the AGID and got us ASF=1. */
 	if (GetASF() != 1)
 	{
 		ioctl_InvalidateAgid(&css.agid);
+		fprintf(fpLog, "Failed to GetASF\n");
 		return -1;
 	}
 	/* Shuffle disc key using bus key */
@@ -425,12 +442,15 @@ int GetDiscKey(void)
 
 	/* Decrypt disc key with player key. */
 	if (DecryptDiscKey(p_buffer, p_disc_key) == -1)
+	{
+		fprintf(fpLog, "Failed to DecryptDiscKey\n");
 		return -1;
+	}
 	memcpy(css.p_disc_key, p_disc_key, KEY_SIZE);
 	return 0;
 }
 
-int GetBusKey(void)
+int GetBusKey(unsigned short ProtectionType)
 {
 	uint8_t   p_buffer[10];
 	uint8_t   p_challenge[2*KEY_SIZE];
@@ -450,9 +470,14 @@ int GetBusKey(void)
 		 * in its authentication process. */
 		css.agid = i;
 		ioctl_InvalidateAgid(&css.agid);
-		i_ret = ioctl_ReportAgidCssCppm(&css.protection, &css.agid);
-		ioctl_InvalidateAgid(&css.agid);
-		i_ret = ioctl_ReportAgidCprm(&css.protection, &css.agid);
+		if (ProtectionType == 1)
+		{
+			i_ret = ioctl_ReportAgidCssCppm(&css.protection, &css.agid);
+		}
+		else if (ProtectionType == 2)
+		{
+			i_ret = ioctl_ReportAgidCprm(&css.protection, &css.agid);
+		}
 	}
 	/* Unable to authenticate without AGID */
 	if (i_ret == -1) return -1;
@@ -520,10 +545,19 @@ int GetBusKey(void)
 int GetASF()
 {
 	int i_asf = 0;
-	if (ioctl_ReportASF(NULL, &i_asf) != 0)
+	if (ioctl_ReportASF(&css.agid, &i_asf) != 0)
 		/* The ioctl process has failed */
 		return -1;
 	return i_asf;
+}
+
+int GetRPC()
+{
+	int p_type, p_mask, p_scheme;
+	if (ioctl_ReportRPC(&p_type, &p_mask, &p_scheme) != 0)
+		/* The ioctl process has failed */
+		return -1;
+	return 0;
 }
 
 void CryptKey(int i_key_type, int i_variant, uint8_t *p_challenge, uint8_t *p_key)
@@ -724,11 +758,15 @@ void DecryptKey(uint8_t invert, uint8_t *p_key, uint8_t *p_crypted, uint8_t *p_r
 
 	i_lfsr1_lo = p_key[0] | 0x100;
 	i_lfsr1_hi = p_key[1];
-
+#if 0
 	i_lfsr0	= ((p_key[4] << 17) | (p_key[3] << 9) | (p_key[2] << 1)) + 8 - (p_key[2] & 7);
 	i_lfsr0	= (p_css_tab4[i_lfsr0 & 0xff] << 24) | (p_css_tab4[(i_lfsr0 >> 8) & 0xff] << 16) |
 	          (p_css_tab4[(i_lfsr0 >> 16) & 0xff] << 8) | p_css_tab4[(i_lfsr0 >> 24) & 0xff];
-
+#else
+	i_lfsr0 = *((unsigned int *)(p_key + 2));
+	o_lfsr1 = i_lfsr0 & 7;
+	i_lfsr0 = i_lfsr0 * 2 + 8 - o_lfsr1;
+#endif
 	i_combined = 0;
 	for(i = 0 ; i < KEY_SIZE ; ++i)
 	{
@@ -736,10 +774,14 @@ void DecryptKey(uint8_t invert, uint8_t *p_key, uint8_t *p_crypted, uint8_t *p_r
 		i_lfsr1_hi  = i_lfsr1_lo >> 1;
 		i_lfsr1_lo  = ((i_lfsr1_lo & 1) << 8) ^ o_lfsr1;
 		o_lfsr1	 = p_css_tab4[o_lfsr1];
-
+#if 0
 		o_lfsr0 = (((((((i_lfsr0 >> 8) ^ i_lfsr0) >> 1)	^ i_lfsr0) >> 3) ^ i_lfsr0) >> 7);
 		i_lfsr0 = (i_lfsr0 >> 8) | (o_lfsr0 << 24);
-
+#else
+		o_lfsr0 = (((((((i_lfsr0 >> 3) ^ i_lfsr0) >> 1) ^ i_lfsr0) >> 8) ^ i_lfsr0) >> 5) & 0xff;
+		i_lfsr0 = (i_lfsr0 << 8) | o_lfsr0;
+		o_lfsr0 = p_css_tab4[o_lfsr0];
+#endif
 		i_combined += (o_lfsr0 ^ invert) + o_lfsr1;
 		k[i] = i_combined & 0xff;
 		i_combined >>= 8;
@@ -773,14 +815,15 @@ void DecryptTitleKey(uint8_t invert, uint8_t *p_key, uint8_t *p_crypted, uint8_t
 
 	i_lfsr1_lo = p_key[0] | 0x100;
 	i_lfsr1_hi = p_key[1];
-
-//	i_lfsr0 = ((p_key[4] << 17) | (p_key[3] << 9) | (p_key[2] << 1)) + 8 - (p_key[2] & 7);
-//	i_lfsr0 = (p_css_tab4[i_lfsr0 & 0xff] << 24) | (p_css_tab4[(i_lfsr0 >> 8) & 0xff] << 16) |
-//		(p_css_tab4[(i_lfsr0 >> 16) & 0xff] << 8) | p_css_tab4[(i_lfsr0 >> 24) & 0xff];
+#if 0
+	i_lfsr0 = ((p_key[4] << 17) | (p_key[3] << 9) | (p_key[2] << 1)) + 8 - (p_key[2] & 7);
+	i_lfsr0 = (p_css_tab4[i_lfsr0 & 0xff] << 24) | (p_css_tab4[(i_lfsr0 >> 8) & 0xff] << 16) |
+		(p_css_tab4[(i_lfsr0 >> 16) & 0xff] << 8) | p_css_tab4[(i_lfsr0 >> 24) & 0xff];
+#else
 	i_lfsr0 = *((unsigned int *)(p_key + 2));
 	o_lfsr1 = i_lfsr0 & 7;
 	i_lfsr0 = i_lfsr0 * 2 + 8 - o_lfsr1;
-
+#endif
 	i_combined = 0;
 	for (i = 0; i < KEY_SIZE; ++i)
 	{
@@ -788,13 +831,14 @@ void DecryptTitleKey(uint8_t invert, uint8_t *p_key, uint8_t *p_crypted, uint8_t
 		i_lfsr1_hi = i_lfsr1_lo >> 1;
 		i_lfsr1_lo = ((i_lfsr1_lo & 1) << 8) ^ o_lfsr1;
 		o_lfsr1 = p_css_tab4[o_lfsr1];
-
-//		o_lfsr0 = (((((((i_lfsr0 >> 8) ^ i_lfsr0) >> 1) ^ i_lfsr0) >> 3) ^ i_lfsr0) >> 7);
+#if 0
+		o_lfsr0 = (((((((i_lfsr0 >> 8) ^ i_lfsr0) >> 1) ^ i_lfsr0) >> 3) ^ i_lfsr0) >> 7);
+		i_lfsr0 = (i_lfsr0 >> 8) | (o_lfsr0 << 24);
+#else
 		o_lfsr0 = (((((((i_lfsr0 >> 3) ^ i_lfsr0) >> 1) ^ i_lfsr0) >> 8) ^ i_lfsr0) >> 5) & 0xff;
-//		i_lfsr0 = (i_lfsr0 >> 8) | (o_lfsr0 << 24);
 		i_lfsr0 = (i_lfsr0 << 8) | o_lfsr0;
 		o_lfsr0 = p_css_tab5[o_lfsr0];
-
+#endif
 		i_combined += (o_lfsr0 ^ invert) + o_lfsr1;
 		k[i] = i_combined & 0xff;
 		i_combined >>= 8;

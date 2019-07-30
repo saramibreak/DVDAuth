@@ -15,25 +15,7 @@
  */
 #include "execScsiCmdforFileSystem.h"
 
-VOID OutputLastErrorNumAndString(
-	LPCTSTR pszFuncName,
-	LONG lLineNum
-) {
-#ifdef _WIN32
-	LPVOID lpMsgBuf;
-	FormatMessage(
-		FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_IGNORE_INSERTS | FORMAT_MESSAGE_FROM_SYSTEM,
-		NULL, GetLastError(), MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPTSTR)&lpMsgBuf, 0, NULL);
-	// http://blog.livedoor.jp/afsoft/archives/52230222.html
-	OutputErrorString("[F:%s][L:%lu] GetLastError: %lu, %s\n",
-		pszFuncName, lLineNum, GetLastError(), (LPCTSTR)lpMsgBuf);
-
-	LocalFree(lpMsgBuf);
-#else
-	OutputErrorString("[F:%s][L:%lu] GetLastError: %lu, %s\n",
-		pszFuncName, lLineNum, GetLastError(), strerror(GetLastError()));
-#endif
-}
+extern VOID OutputLastErrorNumAndString(LPCTSTR pszFuncName, LONG lLineNum);
 
 BOOL ScsiPassThroughDirect(
 	PDEVICE pDevice,
@@ -129,7 +111,7 @@ BOOL ExecReadCD(
 	INT nLBA,
 	LPBYTE lpBuf,
 	DWORD dwBufSize,
-	LPCTSTR pszFuncName,
+	LPCSTR pszFuncName,
 	LONG lLineNum
 ) {
 	REVERSE_BYTES(&lpCmd[2], &nLBA);
@@ -159,10 +141,12 @@ BOOL ExecReadDisc(
 	LPBYTE pCdb,
 	INT nLBA,
 	LPBYTE lpBuf,
-	BYTE byTransferLen
+	BYTE byTransferLen,
+	LPCSTR pszFuncName,
+	LONG lLineNum
 ) {
 	if (!ExecReadCD(pDevice, pCdb, nLBA, lpBuf,
-		(DWORD)(DISC_RAW_READ_SIZE * byTransferLen), __FUNCTION__, __LINE__)) {
+		(DWORD)(DISC_RAW_READ_SIZE * byTransferLen), pszFuncName, lLineNum)) {
 		return FALSE;
 	}
 	return TRUE;
@@ -288,7 +272,8 @@ BOOL ReadDirectoryRecordDetail(
 	PDIRECTORY_RECORD pDirRec,
 	PVOB pVOB
 ) {
-	if (!ExecReadDisc(pDevice, pCdb, nLBA + nOffset, lpBuf, byTransferLen)) {
+	if (!ExecReadDisc(pDevice, pCdb, nLBA + nOffset
+		, lpBuf, byTransferLen, __FUNCTION__, __LINE__)) {
 		return FALSE;
 	}
 	BYTE byRoop = byTransferLen;
@@ -385,7 +370,7 @@ BOOL ReadDirectoryRecord(
 	// for CD-I
 	if (uiRootDataLen == 0) {
 		if (!ExecReadDisc(pDevice, pCdb
-			, (INT)pDirRec[0].uiPosOfDir + nSectorOfs, lpBuf, byTransferLen)) {
+			, (INT)pDirRec[0].uiPosOfDir + nSectorOfs, lpBuf, byTransferLen, __FUNCTION__, __LINE__)) {
 			return FALSE;
 		}
 		uiRootDataLen =
@@ -517,7 +502,7 @@ BOOL ReadPathTableRecord(
 
 			for (DWORD n = 0; n < uiAdditionalTransferLen; n++) {
 				if (!ExecReadDisc(pDevice, pCdb
-					, (INT)uiPathTblPos + nSectorOfs, lpBuf + pDevice->dwMaxTransferLength * n, byTransferLen)) {
+					, (INT)uiPathTblPos + nSectorOfs, lpBuf + pDevice->dwMaxTransferLength * n, byTransferLen, __FUNCTION__, __LINE__)) {
 					throw FALSE;
 				}
 				uiPathTblPos += byTransferLen;
@@ -527,7 +512,7 @@ BOOL ReadPathTableRecord(
 			DWORD dwBufOfs = pDevice->dwMaxTransferLength * uiAdditionalTransferLen;
 
 			if (!ExecReadDisc(pDevice, pCdb
-				, (INT)uiPathTblPos + nSectorOfs, lpBuf + dwBufOfs, byTransferLen)) {
+				, (INT)uiPathTblPos + nSectorOfs, lpBuf + dwBufOfs, byTransferLen, __FUNCTION__, __LINE__)) {
 				throw FALSE;
 			}
 			if (!OutputFsPathTableRecord(lpBuf, uiLogicalBlkCoef, uiPathTblSize, bPathType, pDirRec, nDirPosNum)) {
@@ -536,7 +521,7 @@ BOOL ReadPathTableRecord(
 		}
 		else {
 			if (!ExecReadDisc(pDevice, pCdb
-				, (INT)uiPathTblPos + nSectorOfs, lpBuf, byTransferLen)) {
+				, (INT)uiPathTblPos + nSectorOfs, lpBuf, byTransferLen, __FUNCTION__, __LINE__)) {
 				throw FALSE;
 			}
 			if (!OutputFsPathTableRecord(lpBuf, uiLogicalBlkCoef, uiPathTblSize, bPathType, pDirRec, nDirPosNum)) {
@@ -563,8 +548,8 @@ BOOL ReadVolumeDescriptor(
 ) {
 	INT nTmpLBA = nPVD;
 	for (;;) {
-		if (!ExecReadDisc(pDevice
-			, pCdb, nTmpLBA + nSectorOfs, lpBuf, byTransferLen)) {
+		if (!ExecReadDisc(pDevice, pCdb, nTmpLBA + nSectorOfs
+			, lpBuf, byTransferLen, __FUNCTION__, __LINE__)) {
 			break;
 		}
 		if (!strncmp((LPCH)&lpBuf[1], "CD001", 5)) {
