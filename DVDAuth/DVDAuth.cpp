@@ -63,21 +63,21 @@ int main(int argc, char** argv)
 				CloseHandle(device.hDevice);
 
 				memcpy(&css.vob, vob, sizeof(vob));
-				int ret = dvd_init(argv[1], "css");
+				int ret = dvd_init(argv[1], argv[2]);
 				if (ret == -1) {
 					return 1;
 				}
 			}
 		}
-		else {
-			dvd_init(argv[1], "cprm");
+		else if (!strncmp(argv[2], "cppm", 4) || !strncmp(argv[2], "cprm", 4)) {
+			dvd_init(argv[1], argv[2]);
 		}
 		fclose(fpLog);
 	}
 	else {
 		printf(
 			"Usage: DVDAuth.exe <DriveLetter> <ProtectType> <OutFile>\n"
-			"\tProtectType: css or cprm\n"
+			"\tProtectType: css or cppm or cprm\n"
 		);
 		return 1;
 	}

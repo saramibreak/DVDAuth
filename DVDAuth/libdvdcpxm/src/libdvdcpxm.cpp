@@ -432,6 +432,9 @@ int cppm_set_id_album(unsigned short ProtectionType)
 	}
 	for (i = 0; i < DVD_DISCKEY_SIZE; i++)
 		p_buffer[i] ^= css.p_bus_key[4 - (i % KEY_SIZE)];
+	fprintf(fpLog, "AlbumIdentifier: %02x %02x %02x %02x %02x %02x %02x %02x\n"
+		, p_buffer[80], p_buffer[81], p_buffer[82], p_buffer[83]
+		, p_buffer[84], p_buffer[85], p_buffer[86], p_buffer[87]);
 	id_album = *(uint64_t*)&p_buffer[80];
 	B2N_64(id_album);
 	return 0;
