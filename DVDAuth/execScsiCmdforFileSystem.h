@@ -48,12 +48,14 @@ typedef enum _PATH_TYPE {
 	mType
 } PATH_TYPE, *PPATH_TYPE;
 
+#ifdef _WIN32
 #pragma pack(push, sensedata, 1)
 typedef struct _SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER {
-	SCSI_PASS_THROUGH_DIRECT ScsiPassThroughDirect;
+	SCSI_PASS_THROUGH_DIRECT Sptd;
 	SENSE_DATA SenseData;
 } SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER, *PSCSI_PASS_THROUGH_DIRECT_WITH_BUFFER;
 #pragma pack(pop, sensedata)
+#endif
 
 typedef struct _DEVICE {
 #ifdef _WIN32

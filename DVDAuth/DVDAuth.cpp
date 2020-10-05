@@ -34,12 +34,16 @@ int main(int argc, char** argv)
 			return 1;
 		}
 		if (!strncmp(argv[2], "css", 3)) {
+			DEVICE device = {};
+#ifdef _WIN32
 			char szBuf[8] = { 0 };
 			_snprintf(szBuf, 8, "\\\\.\\%c:", argv[1][0]);
 			szBuf[7] = 0;
-			DEVICE device = {};
 			device.hDevice = CreateFile(szBuf, GENERIC_READ | GENERIC_WRITE,
 				FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
+#else
+			device.hDevice = open(argv[1], O_RDONLY | O_NONBLOCK, 0777);
+#endif
 			if (device.hDevice == INVALID_HANDLE_VALUE) {
 				OutputLastErrorNumAndString(__FUNCTION__, __LINE__);
 				return 1;
@@ -65,12 +69,17 @@ int main(int argc, char** argv)
 				memcpy(&css.vob, vob, sizeof(vob));
 				int ret = dvd_init(argv[1], argv[2]);
 				if (ret == -1) {
+					OutputErrorString("Failed dvd_init\n");
 					return 1;
 				}
 			}
 		}
 		else if (!strncmp(argv[2], "cppm", 4) || !strncmp(argv[2], "cprm", 4)) {
-			dvd_init(argv[1], argv[2]);
+			int ret = dvd_init(argv[1], argv[2]);
+			if (ret == -1) {
+				OutputErrorString("Failed dvd_init\n");
+				return 1;
+			}
 		}
 		fclose(fpLog);
 	}

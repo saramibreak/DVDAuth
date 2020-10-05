@@ -4,6 +4,9 @@
 
 #include "stdint.h"
 #include "dvd_device.h"
+#ifdef __linux__
+#include "../_linux/ntddcdvd.h"
+#endif
 
 #define DVD_KEY_SIZE           5
 #define DVD_CHALLENGE_SIZE    10
@@ -37,7 +40,7 @@
 #define DVD_RPC_KEY_LENGTH              (sizeof(DVD_RPC_KEY) + sizeof(DVD_COPY_PROTECT_KEY))
 #define DVD_ASF_LENGTH                  (sizeof(DVD_ASF) + sizeof(DVD_COPY_PROTECT_KEY))
 
-typedef uint32_t DVD_SESSION_ID, *PDVD_SESSION_ID;
+//typedef uint32_t DVD_SESSION_ID, *PDVD_SESSION_ID;
 
 typedef struct _DVD_PHYSICAL_DESCRIPTOR
 {
@@ -65,8 +68,13 @@ typedef enum
 	DvdProtCPRM
 } DVD_PROT_TYPE;
 
+#ifdef _WIN32
 extern HANDLE h_dvd;
 extern SCSI_PASS_THROUGH_DIRECT sptd;
+#else
+extern int h_dvd;
+extern SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER swb;
+#endif
 extern uint8_t *sptd_buf;
 
 extern void ioctl_Init           (int i_type, int i_size);

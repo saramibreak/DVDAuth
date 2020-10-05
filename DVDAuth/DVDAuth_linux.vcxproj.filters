@@ -1,0 +1,78 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="source">
+      <UniqueIdentifier>{e38b22c8-8352-4286-9332-310b5c1e7f52}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="header">
+      <UniqueIdentifier>{310665bf-c2e4-4ee4-9b09-af24d14e2647}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libdvdcpxm">
+      <UniqueIdentifier>{a9458c11-cb8d-445c-9c77-50434f56cb61}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="_linux">
+      <UniqueIdentifier>{2d83fb93-3598-46c4-9094-216ec8aa99d9}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="DVDAuth.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="execScsiCmdforFileSystem.cpp">
+      <Filter>source</Filter>
+    </ClCompile>
+    <ClCompile Include="libdvdcpxm\src\dvd_command.cpp">
+      <Filter>libdvdcpxm</Filter>
+    </ClCompile>
+    <ClCompile Include="libdvdcpxm\src\dvd_css.cpp">
+      <Filter>libdvdcpxm</Filter>
+    </ClCompile>
+    <ClCompile Include="libdvdcpxm\src\dvd_device.cpp">
+      <Filter>libdvdcpxm</Filter>
+    </ClCompile>
+    <ClCompile Include="libdvdcpxm\src\libdvdcpxm.cpp">
+      <Filter>libdvdcpxm</Filter>
+    </ClCompile>
+    <ClCompile Include="_linux\defineForLinux.cpp">
+      <Filter>_linux</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="execScsiCmdforFileSystem.h">
+      <Filter>header</Filter>
+    </ClInclude>
+    <ClInclude Include="libdvdcpxm\src\dvd_command.h">
+      <Filter>libdvdcpxm</Filter>
+    </ClInclude>
+    <ClInclude Include="libdvdcpxm\src\dvd_css.h">
+      <Filter>libdvdcpxm</Filter>
+    </ClInclude>
+    <ClInclude Include="libdvdcpxm\src\dvd_device.h">
+      <Filter>libdvdcpxm</Filter>
+    </ClInclude>
+    <ClInclude Include="libdvdcpxm\src\dvdcpxm.h">
+      <Filter>libdvdcpxm</Filter>
+    </ClInclude>
+    <ClInclude Include="libdvdcpxm\src\libdvdcpxm.h">
+      <Filter>libdvdcpxm</Filter>
+    </ClInclude>
+    <ClInclude Include="libdvdcpxm\src\stdint.h">
+      <Filter>libdvdcpxm</Filter>
+    </ClInclude>
+    <ClInclude Include="_linux\defineForLinux.h">
+      <Filter>_linux</Filter>
+    </ClInclude>
+    <ClInclude Include="_linux\ntddcdrm.h">
+      <Filter>_linux</Filter>
+    </ClInclude>
+    <ClInclude Include="_linux\ntddmmc.h">
+      <Filter>_linux</Filter>
+    </ClInclude>
+    <ClInclude Include="_linux\scsi.h">
+      <Filter>_linux</Filter>
+    </ClInclude>
+    <ClInclude Include="_linux\ntddcdvd.h">
+      <Filter>_linux</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

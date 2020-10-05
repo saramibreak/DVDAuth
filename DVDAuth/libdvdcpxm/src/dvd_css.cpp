@@ -478,9 +478,17 @@ int GetBusKey(unsigned short ProtectionType)
 		{
 			i_ret = ioctl_ReportAgidCprm(&css.protection, &css.agid);
 		}
+		if (i_ret != -1)
+		{
+			break;
+		}
 	}
 	/* Unable to authenticate without AGID */
-	if (i_ret == -1) return -1;
+	if (i_ret == -1)
+	{
+		fprintf(stderr, "Unable to authenticate without AGID\n");
+		return -1;
+	}
 	/* Setup a challenge, any values should work */
 	for (i = 0; i < 10; ++i)
 		p_challenge[i] = i;
@@ -491,12 +499,14 @@ int GetBusKey(unsigned short ProtectionType)
 	if (ioctl_SendChallenge(&css.agid, p_buffer))
 	{
 		ioctl_InvalidateAgid(&css.agid);
+		fprintf(stderr, "Failed to send challenge to LU\n");
 		return -1;
 	}
 	/* Get key1 from LU */
 	if (ioctl_ReportKey1(&css.agid, p_buffer))
 	{
 		ioctl_InvalidateAgid(&css.agid);
+		fprintf(stderr, "Failed to get key1 from LU\n");
 		return -1;
 	}
 	/* Send key1 to host */
@@ -514,12 +524,14 @@ int GetBusKey(unsigned short ProtectionType)
 	if (i == 32)
 	{
 		ioctl_InvalidateAgid(&css.agid);
+		fprintf(stderr, "Failed to send key1 to host\n");
 		return -1;
 	}
 	/* Get challenge from LU */
 	if (ioctl_ReportChallenge(&css.agid, p_buffer))
 	{
 		ioctl_InvalidateAgid(&css.agid);
+		fprintf(stderr, "Failed to get challenge from LU\n");
 		return -1;
 	}
 	/* Send challenge to host */
@@ -533,6 +545,7 @@ int GetBusKey(unsigned short ProtectionType)
 	if (ioctl_SendKey2(&css.agid, p_buffer))
 	{
 		ioctl_InvalidateAgid(&css.agid);
+		fprintf(stderr, "Failed to send key2 to LU\n");
 		return -1;
 	}
 	/* The drive has accepted us as authentic. */
@@ -911,10 +924,10 @@ int DecryptDiscKey(uint8_t *p_struct_disckey, dvd_key_t p_disc_key)
 			DecryptKey(0, p_disc_key, p_struct_disckey, p_verify);
 			/* If the position / player key pair worked then return. */
 			if (memcmp(p_disc_key, p_verify, KEY_SIZE) == 0) {
-				fprintf(fpLog, "PlayerKey[%ld]: %02X %02X %02X %02X %02X\n"
+				fprintf(fpLog, "PlayerKey[%d]: %02X %02X %02X %02X %02X\n"
 					, n + 1, player_keys[n][0], player_keys[n][1]
 					, player_keys[n][2], player_keys[n][3], player_keys[n][4]);
-				fprintf(fpLog, "DecryptedDiscKey[%03ld]: %02X %02X %02X %02X %02X\n"
+				fprintf(fpLog, "DecryptedDiscKey[%03d]: %02X %02X %02X %02X %02X\n"
 					, i + 1, p_disc_key[0], p_disc_key[1], p_disc_key[2]
 					, p_disc_key[3], p_disc_key[4]);
 				return 0;

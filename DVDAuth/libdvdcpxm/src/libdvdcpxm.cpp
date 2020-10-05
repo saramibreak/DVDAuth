@@ -112,8 +112,13 @@ int ioctl_ReadCPRMMediaId(int *p_agid, uint8_t *p_buffer)
 	int i_ret;
 
 	ioctl_Init(GPCMD_READ_DISC_STRUCTURE, CPRM_MEDIA_ID_SIZE + 4);
+#ifdef _WIN32
 	sptd.Cdb[7]  = CPRM_STRUCT_MEDIA_ID;
 	sptd.Cdb[10] = *p_agid << 6;
+#else
+	swb.io_hdr.cmdp[7] = CPRM_STRUCT_MEDIA_ID;
+	swb.io_hdr.cmdp[10] = *p_agid << 6;
+#endif
 	i_ret = ioctl_Send(&i_bytes); 
 	if (i_ret == 0)
 		memcpy(p_buffer, sptd_buf + 4, CPRM_MEDIA_ID_SIZE);
@@ -126,12 +131,21 @@ int ioctl_ReadCPRMMKBPack(int *p_agid, int mkb_pack, uint8_t *p_mkb_pack, int *p
 	int i_ret;
 
 	ioctl_Init(GPCMD_READ_DISC_STRUCTURE, CPRM_MKB_PACK_SIZE + 4);
+#ifdef _WIN32
 	sptd.Cdb[2]  = ((uint8_t*)&mkb_pack)[3];
 	sptd.Cdb[3]  = ((uint8_t*)&mkb_pack)[2];
 	sptd.Cdb[4]  = ((uint8_t*)&mkb_pack)[1];
 	sptd.Cdb[5]  = ((uint8_t*)&mkb_pack)[0];
 	sptd.Cdb[7]  = CPRM_STRUCT_MKB;
 	sptd.Cdb[10] = *p_agid << 6;
+#else
+	swb.io_hdr.cmdp[2] = ((uint8_t*)&mkb_pack)[3];
+	swb.io_hdr.cmdp[3] = ((uint8_t*)&mkb_pack)[2];
+	swb.io_hdr.cmdp[4] = ((uint8_t*)&mkb_pack)[1];
+	swb.io_hdr.cmdp[5] = ((uint8_t*)&mkb_pack)[0];
+	swb.io_hdr.cmdp[7] = CPRM_STRUCT_MKB;
+	swb.io_hdr.cmdp[10] = *p_agid << 6;
+#endif
 	i_ret = ioctl_Send(&i_bytes); 
 	if (i_ret == 0)
 	{
@@ -141,14 +155,148 @@ int ioctl_ReadCPRMMKBPack(int *p_agid, int mkb_pack, uint8_t *p_mkb_pack, int *p
 	return i_ret;
 }
 
+uint32_t mask32(int n)
+{
+	uint32_t val = 0;
+	switch (n) {
+	case 1:
+		val = 0x01;
+		break;
+	case 2:
+		val = 0x03;
+		break;
+	case 3:
+		val = 0x07;
+		break;
+	case 4:
+		val = 0x0F;
+		break;
+	case 5:
+		val = 0x1F;
+		break;
+	case 6:
+		val = 0x3F;
+		break;
+	case 7:
+		val = 0x7F;
+		break;
+	case 8:
+		val = 0xFF;
+		break;
+	case 9:
+		val = 0x1FF;
+		break;
+	case 10:
+		val = 0x3FF;
+		break;
+	case 11:
+		val = 0x7FF;
+		break;
+	case 12:
+		val = 0xFFF;
+		break;
+	case 13:
+		val = 0x1FFF;
+		break;
+	case 14:
+		val = 0x3FFF;
+		break;
+	case 15:
+		val = 0x7FFF;
+		break;
+	case 16:
+		val = 0xFFFF;
+		break;
+	case 17:
+		val = 0x1FFFF;
+		break;
+	case 18:
+		val = 0x3FFFF;
+		break;
+	case 19:
+		val = 0x7FFFF;
+		break;
+	case 20:
+		val = 0xFFFFF;
+		break;
+	case 21:
+		val = 0x1FFFFF;
+		break;
+	case 22:
+		val = 0x3FFFFF;
+		break;
+	case 23:
+		val = 0x7FFFFF;
+		break;
+	case 24:
+		val = 0xFFFFFF;
+		break;
+	case 25:
+		val = 0x1FFFFFF;
+		break;
+	case 26:
+		val = 0x3FFFFFF;
+		break;
+	case 27:
+		val = 0x7FFFFFF;
+		break;
+	case 28:
+		val = 0xFFFFFFF;
+		break;
+	case 29:
+		val = 0x1FFFFFFF;
+		break;
+	case 30:
+		val = 0x3FFFFFFF;
+		break;
+	case 31:
+		val = 0x7FFFFFFF;
+		break;
+	default:
+		break;
+	}
+	return val;
+}
+
 static uint32_t rol32(uint32_t code, int n)
 {
-	return (code << n) | (code >> (32 - n));
+	return (code << n) | ((code >> (32 - n)) & mask32(n));
+}
+
+uint8_t mask8(int n)
+{
+	uint8_t val = 0;
+	switch (n) {
+	case 1:
+		val = 0x01;
+		break;
+	case 2:
+		val = 0x03;
+		break;
+	case 3:
+		val = 0x07;
+		break;
+	case 4:
+		val = 0x0F;
+		break;
+	case 5:
+		val = 0x1F;
+		break;
+	case 6:
+		val = 0x3F;
+		break;
+	case 7:
+		val = 0x7F;
+		break;
+	default:
+		break;
+	}
+	return val;
 }
 
 static uint8_t rol8(uint8_t code, int n)
 {
-	return (code << n) | (code >> (8 - n));
+	return (code << n) | ((code >> (8 - n)) & mask8(n));
 }
 
 static uint32_t F(uint32_t code, uint32_t key)
@@ -192,8 +340,8 @@ uint64_t c2_enc(uint64_t code, uint64_t key)
 	{
 		ktmpa &= 0x00ffffff;
 		sk[round] = ktmpb + ((uint32_t)sbox[(ktmpa & 0xff) ^ round] << 4);
-		ktmpc = (ktmpb >> (32 - 17));
-		ktmpd = (ktmpa >> (24 - 17));
+		ktmpc = ((ktmpb >> (32 - 17)) & 0x1ffff);
+		ktmpd = ((ktmpa >> (24 - 17)) & 0x1ffffff);
 		ktmpa = (ktmpa << 17) | ktmpc;
 		ktmpb = (ktmpb << 17) | ktmpd;
 	}
@@ -221,8 +369,8 @@ uint64_t c2_dec(uint64_t code, uint64_t key)
 	{
 		ktmpa &= 0x00ffffff;
 		sk[round] = ktmpb + ((uint32_t)sbox[(ktmpa & 0xff) ^ round] << 4);
-		ktmpc = (ktmpb >> (32 - 17));
-		ktmpd = (ktmpa >> (24 - 17));
+		ktmpc = ((ktmpb >> (32 - 17)) & 0x1ffff);
+		ktmpd = ((ktmpa >> (24 - 17)) & 0x1ffffff);
 		ktmpa = (ktmpa << 17) | ktmpc;
 		ktmpb = (ktmpb << 17) | ktmpd;
 	}
@@ -262,8 +410,8 @@ void c2_ecbc(void *p_buffer, uint64_t key, int length)
 		{
 			ktmpa &= 0x00ffffff;
 			sk[round] = ktmpb + ((uint32_t)sbox[(ktmpa & 0xff) ^ round] << 4);
-			ktmpc = (ktmpb >> (32 - 17));
-			ktmpd = (ktmpa >> (24 - 17));
+			ktmpc = ((ktmpb >> (32 - 17)) & 0x1ffff);
+			ktmpd = ((ktmpa >> (24 - 17)) & 0x1ffffff);
 			ktmpa = (ktmpa << 17) | ktmpc;
 			ktmpb = (ktmpb << 17) | ktmpd;
 		}
@@ -307,8 +455,8 @@ void c2_dcbc(void *p_buffer, uint64_t key, int length)
 		{
 			ktmpa &= 0x00ffffff;
 			sk[round] = ktmpb + ((uint32_t)sbox[(ktmpa & 0xff) ^ round] << 4);
-			ktmpc = (ktmpb >> (32 - 17));
-			ktmpd = (ktmpa >> (24 - 17));
+			ktmpc = ((ktmpb >> (32 - 17)) & 0x1ffff);
+			ktmpd = ((ktmpa >> (24 - 17)) & 0x1ffffff);
 			ktmpa = (ktmpa << 17) | ktmpc;
 			ktmpb = (ktmpb << 17) | ktmpd;
 		}
@@ -388,7 +536,7 @@ uint8_t *cprm_get_mkb(unsigned short ProtectionType)
 	}
 	INT nSize = mkb_packs * CPRM_MKB_PACK_SIZE - 16;
 	fprintf(fpLog, "MediaKeyBlock\n"
-		"       +0 +1 +2 +3 +4 +5 +6 +7  +8 +9 +A +B +C +D +E +F\n");
+		"        +0 +1 +2 +3 +4 +5 +6 +7  +8 +9 +A +B +C +D +E +F\n");
 	for (INT k = 0; k < nSize; k += 16) {
 		if (16 > nSize - k) {
 			fprintf(fpLog, "%04X : ", k);
@@ -486,6 +634,7 @@ int process_mkb(uint8_t *p_mkb, device_key_t *p_dev_keys, int nr_dev_keys, uint6
 				if (length < 4)
 					length = 4;
 			}
+			printf("mkb record_type: 0x%02hhx, length: %d\n", record_type, length);
 			switch (record_type) {
 			case 0x82: /* Conditionally calculate media key record */
 				B2N_64(buffer);
@@ -518,7 +667,7 @@ int process_mkb(uint8_t *p_mkb, device_key_t *p_dev_keys, int nr_dev_keys, uint6
 				B2N_64(buffer);
 				if (record_type == 0x82)
 					buffer = c2_dec(buffer, media_key);
-				media_key = c2_dec(buffer, p_dev_keys[i_dev_key].key) & 0x00ffffffffffffff ^ f(column, p_dev_keys[i_dev_key].row);
+				media_key = (c2_dec(buffer, p_dev_keys[i_dev_key].key) & 0x00ffffffffffffff) ^ f(column, p_dev_keys[i_dev_key].row);
 				buffer = c2_dec(verification_data, media_key);
 				if ((buffer & 0xffffffff00000000) == 0xdeadbeef00000000)
 				{
@@ -599,11 +748,12 @@ int dvdcss_init(unsigned short ProtectionType)
 
 int dvdcpxm_init(char *psz_target, unsigned short ProtectionType)
 {
-	char psz_file[MAX_PATH];
+	char psz_file[_MAX_PATH];
 	uint8_t *p_mkb;
 	int ret = -1;
 
 	c2_init();
+	printf("ProtectionType: %d\n", ProtectionType);
 	switch (ProtectionType)
 	{
 	case COPYRIGHT_PROTECTION_NONE:
@@ -612,13 +762,25 @@ int dvdcpxm_init(char *psz_target, unsigned short ProtectionType)
 	case COPYRIGHT_PROTECTION_CPPM:
 		if (cppm_set_id_album(ProtectionType) == 0)
 		{
+#ifdef _WIN32
 			strcpy(psz_file, "?:\\AUDIO_TS\\DVDAUDIO.MKB");
 			psz_file[0] = psz_target[0];
+#else
+			strcpy(psz_file, psz_target);
+			strcat(psz_file, "/AUDIO_TS/DVDAUDIO.MKB");
+#endif
+			printf("fname: %s\n", psz_file);
 			p_mkb = cppm_get_mkb(psz_file);
 			if (!p_mkb)
 			{
+#ifdef _WIN32
 				strcpy(psz_file, "?:\\AUDIO_TS\\DVDAUDIO.BUP");
 				psz_file[0] = psz_target[0];
+#else
+				strcpy(psz_file, psz_target);
+				strcat(psz_file, "/AUDIO_TS/DVDAUDIO.BUP");
+#endif
+				printf("fname: %s\n", psz_file);
 				p_mkb = cppm_get_mkb(psz_file);
 			}
 			if (p_mkb)
@@ -639,13 +801,25 @@ int dvdcpxm_init(char *psz_target, unsigned short ProtectionType)
 				free(p_mkb);
 				if (ret) break;
 			}
+#ifdef _WIN32
 			strcpy(psz_file, "?:\\DVD_RTAV\\VR_MANGR.IFO");
 			psz_file[0] = psz_target[0];
+#else
+			strcpy(psz_file, psz_target);
+			strcat(psz_file, "/DVD_RTAV/VR_MANGR.IFO");
+#endif
+			printf("fname: %s\n", psz_file);
 			ret = vr_get_k_te(psz_file);
 			if (ret)
 			{
+#ifdef _WIN32
 				strcpy(psz_file, "?:\\DVD_RTAV\\VR_MANGR.BUP");
 				psz_file[0] = psz_target[0];
+#else
+				strcpy(psz_file, psz_target);
+				strcat(psz_file, "/DVD_RTAV/VR_MANGR.BUP");
+#endif
+				printf("fname: %s\n", psz_file);
 				ret = vr_get_k_te(psz_file);
 				if (ret) break;
 			}
@@ -657,12 +831,41 @@ int dvdcpxm_init(char *psz_target, unsigned short ProtectionType)
 
 int dvd_init(char *psz_target, char* psz_protection)
 {
-	char psz_dvddev[8];
 	int ret = -1;
-
+#ifdef _WIN32
+	char psz_dvddev[8];
 	strcpy(psz_dvddev, "\\\\.\\?:");
 	psz_dvddev[4] = psz_target[0];
 	h_dvd = dvddev_open(psz_dvddev);
+#else
+	h_dvd = dvddev_open(psz_target);
+	const int nStrSize = _MAX_PATH;
+	char str[nStrSize] = {};
+
+	_snprintf(str, nStrSize,
+		"findmnt -m | grep %s 2>/dev/null > /tmp/DVDAuth.txt", psz_target);
+	system(str);
+
+	FILE* fp = fopen("/tmp/DVDAuth.txt", "r");
+	if (!fp) {
+		fprintf(stderr, "Failed to open /tmp/DVDAuth.txt\n");
+		return -1;
+	}
+
+	char buf[nStrSize] = {};
+	fgets(buf, sizeof(buf), fp);
+	char* pTrimBuf[4] = {};
+	pTrimBuf[0] = _tcstok(buf, " "); // space
+	for (int nRoop = 1; nRoop < 4; nRoop++) {
+		pTrimBuf[nRoop] = strtok(NULL, " "); // space
+	}
+	printf("mount point: %s\n", pTrimBuf[0]);
+	remove("/tmp/DVDAuth.txt");
+	if (!pTrimBuf[0]) {
+		fprintf(stderr, "Failed to open %s\n", psz_target);
+		return -1;
+	}
+#endif
 	if (h_dvd == INVALID_HANDLE_VALUE)
 		return -1;
 
@@ -677,7 +880,11 @@ int dvd_init(char *psz_target, char* psz_protection)
 		ret = dvdcss_init(copyright.CopyrightProtectionType);
 	}
 	else {
+#ifdef _WIN32
 		ret = dvdcpxm_init(psz_target, copyright.CopyrightProtectionType);
+#else
+		ret = dvdcpxm_init(pTrimBuf[0], copyright.CopyrightProtectionType);
+#endif
 	}
 	dvddev_close(h_dvd);
 	return ret;

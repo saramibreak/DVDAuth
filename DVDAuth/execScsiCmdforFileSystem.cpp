@@ -1,5 +1,5 @@
 /**
- * Copyright 2011-2019 sarami
+ * Copyright 2011-2020 sarami
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -30,19 +30,18 @@ BOOL ScsiPassThroughDirect(
 ) {
 	SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER swb = {};
 #ifdef _WIN32
-	swb.ScsiPassThroughDirect.Length = sizeof(SCSI_PASS_THROUGH_DIRECT);
-	swb.ScsiPassThroughDirect.PathId = pDevice->address.PathId;
-	swb.ScsiPassThroughDirect.TargetId = pDevice->address.TargetId;
-	swb.ScsiPassThroughDirect.Lun = pDevice->address.Lun;
-	swb.ScsiPassThroughDirect.CdbLength = byCdbLength;
-	swb.ScsiPassThroughDirect.SenseInfoLength = SENSE_BUFFER_SIZE;
-	swb.ScsiPassThroughDirect.DataIn = (UCHAR)nDataDirection;
-	swb.ScsiPassThroughDirect.DataTransferLength = dwBufferLength;
-	swb.ScsiPassThroughDirect.TimeOutValue = pDevice->dwTimeOutValue;
-	swb.ScsiPassThroughDirect.DataBuffer = pvBuffer;
-	swb.ScsiPassThroughDirect.SenseInfoOffset =
-		offsetof(SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER, SenseData);
-	memcpy(swb.ScsiPassThroughDirect.Cdb, lpCdb, byCdbLength);
+	swb.Sptd.Length = sizeof(SCSI_PASS_THROUGH_DIRECT);
+	swb.Sptd.PathId = pDevice->address.PathId;
+	swb.Sptd.TargetId = pDevice->address.TargetId;
+	swb.Sptd.Lun = pDevice->address.Lun;
+	swb.Sptd.CdbLength = byCdbLength;
+	swb.Sptd.SenseInfoLength = SENSE_BUFFER_SIZE;
+	swb.Sptd.DataIn = (UCHAR)nDataDirection;
+	swb.Sptd.DataTransferLength = dwBufferLength;
+	swb.Sptd.TimeOutValue = pDevice->dwTimeOutValue;
+	swb.Sptd.DataBuffer = pvBuffer;
+	swb.Sptd.SenseInfoOffset = offsetof(SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER, SenseData);
+	memcpy(swb.Sptd.Cdb, lpCdb, byCdbLength);
 #else
 	swb.io_hdr.interface_id = 'S';
 	swb.io_hdr.dxfer_direction = nDataDirection;
@@ -53,7 +52,7 @@ BOOL ScsiPassThroughDirect(
 	swb.io_hdr.cmdp = (unsigned char *)lpCdb;
 	swb.io_hdr.sbp = swb.Dummy;
 	swb.io_hdr.timeout = (unsigned int)pDevice->dwTimeOutValue;
-	//	swb.io_hdr.flags = SG_FLAG_DIRECT_IO;
+//	swb.io_hdr.flags = SG_FLAG_DIRECT_IO;
 #endif
 	DWORD dwLength = sizeof(SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER);
 	DWORD dwReturned = 0;
@@ -72,23 +71,40 @@ BOOL ScsiPassThroughDirect(
 			bNoSense = TRUE;
 		}
 
-		if (swb.ScsiPassThroughDirect.ScsiStatus >= SCSISTAT_CHECK_CONDITION &&
-			!bNoSense) {
+#ifdef _WIN32
+		if (swb.Sptd.ScsiStatus >= SCSISTAT_CHECK_CONDITION && !bNoSense) {
 			INT nLBA = 0;
-			if (swb.ScsiPassThroughDirect.Cdb[0] == 0xa8 ||
-				swb.ScsiPassThroughDirect.Cdb[0] == 0xad ||
-				swb.ScsiPassThroughDirect.Cdb[0] == 0xbe ||
-				swb.ScsiPassThroughDirect.Cdb[0] == 0xd8) {
-				nLBA = (swb.ScsiPassThroughDirect.Cdb[2] << 24)
-					+ (swb.ScsiPassThroughDirect.Cdb[3] << 16)
-					+ (swb.ScsiPassThroughDirect.Cdb[4] << 8)
-					+ swb.ScsiPassThroughDirect.Cdb[5];
+			if (swb.Sptd.Cdb[0] == 0xa8 ||
+				swb.Sptd.Cdb[0] == 0xad ||
+				swb.Sptd.Cdb[0] == 0xbe ||
+				swb.Sptd.Cdb[0] == 0xd8) {
+				nLBA = (swb.Sptd.Cdb[2] << 24)
+					+ (swb.Sptd.Cdb[3] << 16)
+					+ (swb.Sptd.Cdb[4] << 8)
+					+ swb.Sptd.Cdb[5];
 			}
 			OutputErrorString(
 				"\rLBA[%06d, %#07x]: [F:%s][L:%ld]\n\tOpcode: %#02x\n"
-				, nLBA, nLBA, pszFuncName, lLineNum, swb.ScsiPassThroughDirect.Cdb[0]);
-			//			OutputScsiStatus(swb.ScsiPassThroughDirect.ScsiStatus);
-			//			OutputSenseData(&swb.SenseData);
+				, nLBA, nLBA, pszFuncName, lLineNum, swb.Sptd.Cdb[0]);
+//			OutputScsiStatus(swb.Sptd.ScsiStatus);
+#else
+		if (swb.io_hdr.status >= SCSISTAT_CHECK_CONDITION && !bNoSense) {
+			INT nLBA = 0;
+			if (swb.io_hdr.cmdp[0] == 0xa8 ||
+				swb.io_hdr.cmdp[0] == 0xad ||
+				swb.io_hdr.cmdp[0] == 0xbe ||
+				swb.io_hdr.cmdp[0] == 0xd8) {
+				nLBA = (swb.io_hdr.cmdp[2] << 24)
+					+ (swb.io_hdr.cmdp[3] << 16)
+					+ (swb.io_hdr.cmdp[4] << 8)
+					+ swb.io_hdr.cmdp[5];
+			}
+			OutputErrorString(
+				"\rLBA[%06d, %#07x]: [F:%s][L:%ld]\n\tOpcode: %#02x\n"
+				, nLBA, (UINT)nLBA, pszFuncName, lLineNum, swb.io_hdr.cmdp[0]);
+//			OutputScsiStatus(swb.io_hdr.status);
+#endif
+//			OutputSenseData(&swb.SenseData);
 
 		}
 	}
@@ -97,7 +113,7 @@ BOOL ScsiPassThroughDirect(
 	}
 	else {
 #ifdef _WIN32
-		*byScsiStatus = swb.ScsiPassThroughDirect.ScsiStatus;
+		*byScsiStatus = swb.Sptd.ScsiStatus;
 #else
 		*byScsiStatus = swb.io_hdr.status;
 #endif
@@ -286,18 +302,11 @@ BOOL ReadDirectoryRecordDetail(
 			CHAR szCurDirName[MAX_FNAME_FOR_VOLUME] = {};
 			LPBYTE lpDirRec = lpBuf + uiOfs;
 			if (lpDirRec[0] >= MIN_LEN_DR) {
-				if (lpDirRec[0] == MIN_LEN_DR && uiOfs > 0 && uiOfs % DISC_RAW_READ_SIZE == 0) {
-					// SimCity 3000 (USA)
-					OutputErrorString(
-						"Direcory record size of the %d sector maybe incorrect. Skip the reading of this sector\n", nLBA);
-					nSectorNum++;
-					break;
-				}
 				UINT uiExtentPos = GetSizeOrUintForVolDesc(lpDirRec + 2, 0xffffffff) / uiLogicalBlkCoef;
 				UINT uiDataLen = GetSizeOrUintForVolDesc(lpDirRec + 10, 0xffffffff);
 				OutputFsDirectoryRecord(lpDirRec, szCurDirName);
 				if (strstr(szCurDirName, ".VOB")) {
-					strncpy(pVOB[pVOB->idx].fname, szCurDirName, strlen(szCurDirName) - 2);
+					strncpy(pVOB[pVOB->idx].fname, szCurDirName, MAX_FNAME_FOR_VOLUME);
 					pVOB[pVOB->idx].lba = (INT)uiExtentPos;
 					pVOB->idx++;
 				}
