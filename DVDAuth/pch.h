@@ -1,7 +1,7 @@
 ﻿#ifndef PCH_H
 #define PCH_H
 
-#pragma warning(disable:4710 4711)
+#pragma warning(disable:4710 4711 5045)
 #pragma warning(push)
 #pragma warning(disable:4668 4820 5039)
 #include <windows.h>
