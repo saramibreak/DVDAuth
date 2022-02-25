@@ -310,7 +310,43 @@ BOOL ReadDirectoryRecordDetail(
 					pVOB[pVOB->idx].lba = (INT)uiExtentPos;
 					pVOB->idx++;
 				}
-				uiOfs += lpDirRec[0];
+				UINT uiPaddingSize = 0;
+				INT nDirOfs = 33 + lpDirRec[32];
+				if (lpDirRec[32] % 2 == 0) {
+					nDirOfs++;
+				}
+				if (nDirOfs < lpDirRec[0]) {
+					for (; nDirOfs + uiPaddingSize < lpDirRec[0];) {
+						// Incorrect directory record length
+						// The Shooting Love: XII Stag & Trizeal [DVD] (Japan)
+						// 0170 :                          3C 00 91 A4 3D 00 00 3D   1.......<...=..=
+						// 0180 : A4 91 24 72 01 00 00 01  72 24 6A 03 10 01 31 2C   ..$r....r$j...1,
+						// 0190 : 24 00 00 00 01 00 00 01  03 00 3B 31 00 00 00 00   $.........;1....
+						// 01A0 : 00 00 3C 00 C0 A4 3D 00  00 3D A4 C0 A4 16 08 00   ..<...=..=......
+						// 01B0 : 00 08 16 A4
+						if (lpDirRec[nDirOfs + uiPaddingSize] > MIN_LEN_DR &&
+							lpDirRec[nDirOfs + uiPaddingSize + 2] == lpDirRec[nDirOfs + uiPaddingSize + 9] &&
+							lpDirRec[nDirOfs + uiPaddingSize + 3] == lpDirRec[nDirOfs + uiPaddingSize + 8] &&
+							lpDirRec[nDirOfs + uiPaddingSize + 4] == lpDirRec[nDirOfs + uiPaddingSize + 7] &&
+							lpDirRec[nDirOfs + uiPaddingSize + 5] == lpDirRec[nDirOfs + uiPaddingSize + 6] &&
+							lpDirRec[nDirOfs + uiPaddingSize + 10] == lpDirRec[nDirOfs + uiPaddingSize + 17] &&
+							lpDirRec[nDirOfs + uiPaddingSize + 11] == lpDirRec[nDirOfs + uiPaddingSize + 16] &&
+							lpDirRec[nDirOfs + uiPaddingSize + 12] == lpDirRec[nDirOfs + uiPaddingSize + 15] &&
+							lpDirRec[nDirOfs + uiPaddingSize + 13] == lpDirRec[nDirOfs + uiPaddingSize + 14]) {
+							if (!(lpDirRec[nDirOfs + uiPaddingSize + 2] == 0 && lpDirRec[nDirOfs + uiPaddingSize + 3] == 0 &&
+								lpDirRec[nDirOfs + uiPaddingSize + 4] == 0 && lpDirRec[nDirOfs + uiPaddingSize + 5] == 0) &&
+								!(lpDirRec[nDirOfs + uiPaddingSize + 10] == 0 && lpDirRec[nDirOfs + uiPaddingSize + 11] == 0 &&
+								lpDirRec[nDirOfs + uiPaddingSize + 12] == 0 && lpDirRec[nDirOfs + uiPaddingSize + 13] == 0)) {
+								break;
+							}
+						}
+						uiPaddingSize++;
+					}
+					uiOfs += nDirOfs + uiPaddingSize;
+				}
+				else {
+					uiOfs += lpDirRec[0];
+				}
 
 				if ((lpDirRec[25] & 0x02)
 					&& !(lpDirRec[32] == 1 && szCurDirName[0] == 0)
