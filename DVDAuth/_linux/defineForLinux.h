@@ -13,16 +13,7 @@ typedef unsigned short      UINT16, *PUINT16;
 typedef unsigned int        UINT32, *PUINT32;
 typedef unsigned long long  UINT64, *PUINT64, ULONGLONG;
 
-#if defined(__x86_64__)
-typedef long long INT_PTR, *PINT_PTR;
-typedef unsigned long long UINT_PTR, *PUINT_PTR;
-
-typedef long long LONG_PTR, * PLONG_PTR;
-typedef unsigned long long ULONG_PTR, *PULONG_PTR;
-
-#define __int3264   __int64
-
-#else
+#if defined(_WIN32)
 typedef _W64 int INT_PTR, * PINT_PTR;
 typedef _W64 unsigned int UINT_PTR, * PUINT_PTR;
 
@@ -30,6 +21,15 @@ typedef _W64 long LONG_PTR, * PLONG_PTR;
 typedef _W64 unsigned long ULONG_PTR, * PULONG_PTR;
 
 #define __int3264   __int32
+
+#else
+typedef long long INT_PTR, *PINT_PTR;
+typedef unsigned long long UINT_PTR, *PUINT_PTR;
+
+typedef long long LONG_PTR, * PLONG_PTR;
+typedef unsigned long long ULONG_PTR, *PULONG_PTR;
+
+#define __int3264   __int64
 
 #endif
 
