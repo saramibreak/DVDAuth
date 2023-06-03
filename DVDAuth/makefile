@@ -1,5 +1,10 @@
-TARGET := DVDAuth_linux.out
-INCFLAGS := -I. -Ilibdvdcpxm/src -I_linux
+TARGET := DVDAuth.out
+ifeq ($(shell uname),Linux)
+  INCFLAGS := -I. -Ilibdvdcpxm/src -I_linux
+else ifeq ($(shell uname),Darwin)
+  INCFLAGS := -I. -Ilibdvdcpxm/src -I_linux -I/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks
+  LIBS := -framework CoreFoundation -framework IOKit
+endif
 CFLAGS := -include _linux/defineForLinux.h
 CXXFLAGS := $(CFLAGS) -std=c++11
 
@@ -44,5 +49,12 @@ clean-objs:
 clean:
 	rm -f $(OBJECTS)
 	rm -f $(TARGET)
+
+ifeq ($(PREFIX),)
+    PREFIX := /usr/local
+endif
+
+install:
+	install -m 0755 $(TARGET) $(DESTDIR)$(PREFIX)/bin/$(TARGET)
 
 .PHONY: clean clean-objs

@@ -111,47 +111,82 @@ int ioctl_ReadCPRMMediaId(int *p_agid, uint8_t *p_buffer)
 	int i_bytes;
 	int i_ret;
 
-	ioctl_Init(GPCMD_READ_DISC_STRUCTURE, CPRM_MEDIA_ID_SIZE + 4);
 #ifdef _WIN32
+	ioctl_Init(GPCMD_READ_DISC_STRUCTURE, CPRM_MEDIA_ID_SIZE + 4);
 	sptd.Cdb[7]  = CPRM_STRUCT_MEDIA_ID;
 	sptd.Cdb[10] = *p_agid << 6;
-#else
-	swb.io_hdr.cmdp[7] = CPRM_STRUCT_MEDIA_ID;
-	swb.io_hdr.cmdp[10] = *p_agid << 6;
-#endif
 	i_ret = ioctl_Send(&i_bytes); 
 	if (i_ret == 0)
 		memcpy(p_buffer, sptd_buf + 4, CPRM_MEDIA_ID_SIZE);
+#elif __linux__
+	ioctl_Init(GPCMD_READ_DISC_STRUCTURE, CPRM_MEDIA_ID_SIZE + 4);
+	swb.io_hdr.cmdp[7] = CPRM_STRUCT_MEDIA_ID;
+	swb.io_hdr.cmdp[10] = *p_agid << 6;
+	i_ret = ioctl_Send(&i_bytes); 
+	if (i_ret == 0)
+		memcpy(p_buffer, sptd_buf + 4, CPRM_MEDIA_ID_SIZE);
+#elif __MACH__
+	dk_dvd_read_structure_t dvd;
+	uint8_t dvdbs[CPRM_MEDIA_ID_SIZE + 4];
+	dvd.format = CPRM_STRUCT_MEDIA_ID;
+	dvd.buffer = &dvdbs;
+	dvd.bufferLength = sizeof(dvdbs);
+    
+	dvd.grantID = *p_agid;
+
+    i_ret = ioctl( h_dvd, DKIOCDVDREADSTRUCTURE, &dvd );
+	if (i_ret == 0)
+		memcpy(p_buffer, dvd.buffer, sizeof(dvd.bufferLength));
+#endif
 	return i_ret;
 }
 
 int ioctl_ReadCPRMMKBPack(int *p_agid, int mkb_pack, uint8_t *p_mkb_pack, int *p_total_packs)
 {
-	int i_bytes;
 	int i_ret;
 
 	ioctl_Init(GPCMD_READ_DISC_STRUCTURE, CPRM_MKB_PACK_SIZE + 4);
 #ifdef _WIN32
+	int i_bytes;
 	sptd.Cdb[2]  = ((uint8_t*)&mkb_pack)[3];
 	sptd.Cdb[3]  = ((uint8_t*)&mkb_pack)[2];
 	sptd.Cdb[4]  = ((uint8_t*)&mkb_pack)[1];
 	sptd.Cdb[5]  = ((uint8_t*)&mkb_pack)[0];
 	sptd.Cdb[7]  = CPRM_STRUCT_MKB;
 	sptd.Cdb[10] = *p_agid << 6;
-#else
-	swb.io_hdr.cmdp[2] = ((uint8_t*)&mkb_pack)[3];
-	swb.io_hdr.cmdp[3] = ((uint8_t*)&mkb_pack)[2];
-	swb.io_hdr.cmdp[4] = ((uint8_t*)&mkb_pack)[1];
-	swb.io_hdr.cmdp[5] = ((uint8_t*)&mkb_pack)[0];
-	swb.io_hdr.cmdp[7] = CPRM_STRUCT_MKB;
-	swb.io_hdr.cmdp[10] = *p_agid << 6;
-#endif
 	i_ret = ioctl_Send(&i_bytes); 
 	if (i_ret == 0)
 	{
 		*p_total_packs = sptd_buf[3];
 		memcpy(p_mkb_pack, sptd_buf + 4, CPRM_MKB_PACK_SIZE);
 	}
+#elif __linux__
+	int i_bytes;
+	swb.io_hdr.cmdp[2] = ((uint8_t*)&mkb_pack)[3];
+	swb.io_hdr.cmdp[3] = ((uint8_t*)&mkb_pack)[2];
+	swb.io_hdr.cmdp[4] = ((uint8_t*)&mkb_pack)[1];
+	swb.io_hdr.cmdp[5] = ((uint8_t*)&mkb_pack)[0];
+	swb.io_hdr.cmdp[7] = CPRM_STRUCT_MKB;
+	swb.io_hdr.cmdp[10] = *p_agid << 6;
+	i_ret = ioctl_Send(&i_bytes); 
+	if (i_ret == 0)
+	{
+		*p_total_packs = sptd_buf[3];
+		memcpy(p_mkb_pack, sptd_buf + 4, CPRM_MKB_PACK_SIZE);
+	}
+#elif __MACH__
+	dk_dvd_read_structure_t dvd;
+	uint8_t dvdbs[CPRM_MKB_PACK_SIZE];
+	dvd.format = CPRM_STRUCT_MKB;
+	dvd.buffer = &dvdbs;
+	dvd.bufferLength = sizeof(dvdbs);
+    
+	dvd.grantID = *p_agid;
+
+    i_ret = ioctl( h_dvd, DKIOCDVDREADSTRUCTURE, &dvd );
+	if (i_ret == 0)
+		memcpy(p_mkb_pack, dvd.buffer, sizeof(dvd.bufferLength));
+#endif
 	return i_ret;
 }
 
@@ -838,7 +873,9 @@ int dvd_init(char *psz_target, char* psz_protection)
 	psz_dvddev[4] = psz_target[0];
 	h_dvd = dvddev_open(psz_dvddev);
 #else
+#if defined (__linux__) || defined (__MACH__)
 	h_dvd = dvddev_open(psz_target);
+#ifdef __linux__
 	const int nStrSize = _MAX_PATH;
 	char str[nStrSize] = {};
 
@@ -866,9 +903,12 @@ int dvd_init(char *psz_target, char* psz_protection)
 		return -1;
 	}
 #endif
-	if (h_dvd == INVALID_HANDLE_VALUE)
+#endif
+#endif
+	if (h_dvd == INVALID_HANDLE_VALUE) {
+		fprintf(stderr, "Device open error: %d\n", GetLastError());
 		return -1;
-
+	}
 	DVD_COPYRIGHT_DESCRIPTOR copyright;
 	if (ioctl_ReadCopyright(0, &copyright) < 0)
 	{
@@ -877,14 +917,11 @@ int dvd_init(char *psz_target, char* psz_protection)
 	}
 
 	if (!strncmp(psz_protection, "css", 3)) {
+		printf("CopyrightProtectionType: %d\n", copyright.CopyrightProtectionType);
 		ret = dvdcss_init(copyright.CopyrightProtectionType);
 	}
 	else {
-#ifdef _WIN32
 		ret = dvdcpxm_init(psz_target, copyright.CopyrightProtectionType);
-#else
-		ret = dvdcpxm_init(pTrimBuf[0], copyright.CopyrightProtectionType);
-#endif
 	}
 	dvddev_close(h_dvd);
 	return ret;

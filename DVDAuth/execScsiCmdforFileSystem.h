@@ -1,5 +1,5 @@
 /**
- * Copyright 2011-2019 sarami
+ * Copyright 2011-2023 sarami
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -60,8 +60,10 @@ typedef struct _SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER {
 typedef struct _DEVICE {
 #ifdef _WIN32
 	HANDLE hDevice;
-#else
+#elif __linux__
 	int hDevice;
+#elif __MACH__
+	SCSITaskInterface** hDevice;
 #endif
 	SCSI_ADDRESS address;
 	DWORD dwMaxTransferLength;

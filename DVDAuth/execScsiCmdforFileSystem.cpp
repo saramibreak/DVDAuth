@@ -1,5 +1,5 @@
 /**
- * Copyright 2011-2020 sarami
+ * Copyright 2011-2023 sarami
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@ BOOL ScsiPassThroughDirect(
 	swb.Sptd.DataBuffer = pvBuffer;
 	swb.Sptd.SenseInfoOffset = offsetof(SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER, SenseData);
 	memcpy(swb.Sptd.Cdb, lpCdb, byCdbLength);
-#else
+#elif __linux__
 	swb.io_hdr.interface_id = 'S';
 	swb.io_hdr.dxfer_direction = nDataDirection;
 	swb.io_hdr.cmd_len = byCdbLength;
@@ -53,6 +53,40 @@ BOOL ScsiPassThroughDirect(
 	swb.io_hdr.sbp = swb.Dummy;
 	swb.io_hdr.timeout = (unsigned int)pDevice->dwTimeOutValue;
 //	swb.io_hdr.flags = SG_FLAG_DIRECT_IO;
+#elif __MACH__
+	UNREFERENCED_PARAMETER(nDataDirection);
+	// https://developer.apple.com/library/archive/documentation/DeviceDrivers/Conceptual/WorkingWithSAM/WWS_SAMDevInt/WWS_SAM_DevInt.html#//apple_ref/doc/uid/TP30000387-SW1
+    IOReturn         err  = 0;
+    IOVirtualRange* range = NULL;
+	// Allocate a virtual range for the buffer. If we had more than 1 scatter-gather entry,
+	// we would allocate more than 1 IOVirtualRange.
+	if (NULL == (range = (IOVirtualRange*)malloc(sizeof(IOVirtualRange)))) {
+		fprintf(stderr, "*********** ERROR Malloc'ing IOVirtualRange ***********\n\n");
+		return FALSE;
+	}
+	// Set up the range. The address is just the buffer's address. The length is our request size.
+	range->address = (IOVirtualAddress)pvBuffer;
+	range->length  = dwBufferLength;
+
+	SCSICommandDescriptorBlock cdb;
+	memcpy(&cdb, lpCdb, byCdbLength);
+
+	// Set the actual CDB in the task
+	if (kIOReturnSuccess != (err = (*pDevice->hDevice)->SetCommandDescriptorBlock(pDevice->hDevice, cdb, byCdbLength))) {
+		fprintf(stderr, "*********** ERROR Setting CDB ***********\n\n");
+		return FALSE;
+	}
+	// Set the scatter-gather entry in the task
+	if (kIOReturnSuccess != (err = (*pDevice->hDevice)->SetScatterGatherEntries(
+		pDevice->hDevice, range, 1, dwBufferLength, kSCSIDataTransfer_FromTargetToInitiator))) {
+		fprintf(stderr, "*********** ERROR Setting SG Entries ***********\n\n");
+		return FALSE;
+	}
+	// Set the timeout in the task
+	if (kIOReturnSuccess != (err = (*pDevice->hDevice)->SetTimeoutDuration(pDevice->hDevice, 10000))) {
+		fprintf(stderr, "*********** ERROR Setting Timeout ***********\n\n");
+		return FALSE;
+	}
 #endif
 	DWORD dwLength = sizeof(SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER);
 	DWORD dwReturned = 0;
@@ -70,7 +104,6 @@ BOOL ScsiPassThroughDirect(
 			swb.SenseData.AdditionalSenseCodeQualifier == 0x00) {
 			bNoSense = TRUE;
 		}
-
 #ifdef _WIN32
 		if (swb.Sptd.ScsiStatus >= SCSISTAT_CHECK_CONDITION && !bNoSense) {
 			INT nLBA = 0;
@@ -87,7 +120,7 @@ BOOL ScsiPassThroughDirect(
 				"\rLBA[%06d, %#07x]: [F:%s][L:%ld]\n\tOpcode: %#02x\n"
 				, nLBA, nLBA, pszFuncName, lLineNum, swb.Sptd.Cdb[0]);
 //			OutputScsiStatus(swb.Sptd.ScsiStatus);
-#else
+#elif __linux__
 		if (swb.io_hdr.status >= SCSISTAT_CHECK_CONDITION && !bNoSense) {
 			INT nLBA = 0;
 			if (swb.io_hdr.cmdp[0] == 0xa8 ||
@@ -103,9 +136,10 @@ BOOL ScsiPassThroughDirect(
 				"\rLBA[%06d, %#07x]: [F:%s][L:%ld]\n\tOpcode: %#02x\n"
 				, nLBA, (UINT)nLBA, pszFuncName, lLineNum, swb.io_hdr.cmdp[0]);
 //			OutputScsiStatus(swb.io_hdr.status);
+#elif __MACH__
+		if (swb.taskStatus >= SCSISTAT_CHECK_CONDITION && !bNoSense) {
 #endif
 //			OutputSenseData(&swb.SenseData);
-
 		}
 	}
 	if (bNoSense) {
@@ -114,8 +148,11 @@ BOOL ScsiPassThroughDirect(
 	else {
 #ifdef _WIN32
 		*byScsiStatus = swb.Sptd.ScsiStatus;
-#else
+#elif __linux__
 		*byScsiStatus = swb.io_hdr.status;
+#elif __MACH__
+		*byScsiStatus = swb.taskStatus;
+		FreeAndNull(range);
 #endif
 	}
 	return bRet;

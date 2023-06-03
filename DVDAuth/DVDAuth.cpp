@@ -41,10 +41,16 @@ int main(int argc, char** argv)
 			szBuf[7] = 0;
 			device.hDevice = CreateFile(szBuf, GENERIC_READ | GENERIC_WRITE,
 				FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL);
-#else
+#elif __linux__
 			device.hDevice = open(argv[1], O_RDONLY | O_NONBLOCK, 0777);
+#elif __MACH__
+			device.hDevice = GetSCSITaskInterface(argv[1]);
 #endif
+#if defined (_WIN32) || defined (__linux__)
 			if (device.hDevice == INVALID_HANDLE_VALUE) {
+#elif __MACH__
+			if (device.hDevice == NULL) {
+#endif
 				OutputLastErrorNumAndString(__FUNCTION__, __LINE__);
 				return 1;
 			}
@@ -54,7 +60,11 @@ int main(int argc, char** argv)
 			if (NULL == (lpBuf = (LPBYTE)calloc(
 				device.dwMaxTransferLength, sizeof(BYTE)))) {
 				OutputLastErrorNumAndString(__FUNCTION__, __LINE__);
+#if defined (_WIN32) || defined (__linux__)
 				CloseHandle(device.hDevice);
+#elif __MACH__
+				CloseHandleTask(device.hDevice);
+#endif
 			}
 			else {
 				device.dwTimeOutValue = 60;
@@ -64,8 +74,12 @@ int main(int argc, char** argv)
 
 				ReadDVDForFileSystem(&device, &cdb, lpBuf, vob);
 				free(lpBuf);
+#if defined (_WIN32) || defined (__linux__)
 				CloseHandle(device.hDevice);
-
+#elif __MACH__
+				CloseHandleTask(device.hDevice);
+				usleep(5000000);
+#endif
 				memcpy(&css.vob, vob, sizeof(vob));
 				int ret = dvd_init(argv[1], argv[2]);
 				if (ret == -1) {
@@ -75,11 +89,19 @@ int main(int argc, char** argv)
 			}
 		}
 		else if (!strncmp(argv[2], "cppm", 4) || !strncmp(argv[2], "cprm", 4)) {
+#ifdef __MACH__
+			usleep(5000000);
+#endif
 			int ret = dvd_init(argv[1], argv[2]);
 			if (ret == -1) {
 				OutputErrorString("Failed dvd_init\n");
 				return 1;
 			}
+#ifdef __MACH__
+			if (!strncmp(argv[2], "cprm", 4)) {
+				usleep(50000000);
+			}
+#endif
 		}
 		fclose(fpLog);
 	}
