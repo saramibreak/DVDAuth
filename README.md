@@ -6,7 +6,7 @@ This is a CSS or CPPM or CPRM authentication tool
         DVDAuth.exe <DriveLetter> <ProtectType> <OutFile>
         ProtectType: css or cppm or cprm
 
-- Linux  
+- Linux, macOS  
         sudo ./DVDAuth.out <DriveLetter> <ProtectType> <OutFile>
 
 ## Development Tool
@@ -21,16 +21,16 @@ This is a CSS or CPPM or CPRM authentication tool
       https://docs.microsoft.com/en-us/windows/wsl/install-win10
 
 - Linux
-  - gcc, make, findmnt, grep
+  - GCC, make, findmnt, grep
 
 - macOS
-  - clang, make MacOSX.sdk
+  - Clang, make MacOSX.sdk
 
 ## License
  See LICENSE  
  Original source (libdvdcpxm) is DVD-Audio Explorer of Adam Sampson  
   https://offog.org/git/dvdaexplorer/  
  Or foo_input_dvda-0.4.11  
-  https://sourceforge.net/projects/dvdadecoder/files/foo_input_dvda/
- and libdvdcss
+  https://sourceforge.net/projects/dvdadecoder/files/foo_input_dvda/  
+ and libdvdcss  
   https://www.videolan.org/developers/libdvdcss.html
