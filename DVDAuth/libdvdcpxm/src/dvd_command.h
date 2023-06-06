@@ -4,9 +4,7 @@
 
 #include "stdint.h"
 #include "dvd_device.h"
-#ifdef __linux__
-#include "../_linux/ntddcdvd.h"
-#elif __MACH__
+#ifdef __MACH__
 #include <Kernel.framework/Headers/IOKit/storage/IODVDMediaBSDClient.h>
 #define INIT_DVDIOCTL( DKDVD_TYPE, BUFFER_TYPE, FORMAT ) \
     DKDVD_TYPE dvd = { 0 }; \

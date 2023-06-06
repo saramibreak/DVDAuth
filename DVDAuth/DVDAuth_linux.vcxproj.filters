@@ -71,8 +71,5 @@
     <ClInclude Include="_linux\scsi.h">
       <Filter>_linux</Filter>
     </ClInclude>
-    <ClInclude Include="_linux\ntddcdvd.h">
-      <Filter>_linux</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>
